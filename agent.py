@@ -6,6 +6,7 @@ import operator
 import numpy as np
 import time
 from collections import OrderedDict
+import matplotlib.pyplot as plt
 
 
 class LearningAgent(Agent):
@@ -17,12 +18,13 @@ class LearningAgent(Agent):
         self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
         
         # TODO: Initialize any additional variables here
-        self.QvaluePrev = 0
-        self.initQvalue = 0   # initial Qvalue if the value does not exist in the table 
+        self.initQvalue = 2   # initial Qvalue if the value does not exist in the table      
+        
+        
         self.Qtable = {'start':{None:0}}
         self.statePrev = 'start'
         self.actionPrev = None
-        self.QvaluePrev = 0
+        self.QvaluePrev = self.initQvalue
         self.initDeadline = 0
         self.dtime = 0
         self.level_1 = 0
@@ -30,7 +32,15 @@ class LearningAgent(Agent):
         self.level_3 = 0
         self.level_4 = 0
         self.qvalue_change = np.empty([0, 0])  # array of changes in qvalues
-        self.trial_number = 0
+        self.trial_number = 1
+        self.alpha_start = 0.8    # learning rate =  1 = full learning, 0 = no learning
+        self.gamma_start = 1.0    # discount rate = Gamma of 1 emphasizes long term rewards, 0 for short term rewards
+        self.epsilon_start = 0.3  # epsilon = how often to choose a random action, 1 = always, 0 = never
+        self.alpha = self.alpha_start
+        self.gamma = self.gamma_start
+        self.epsilon = self.epsilon_start
+        self.rewards = OrderedDict()
+        self.total_reward = 0
 
 
     def reset(self, destination=None):
@@ -39,12 +49,31 @@ class LearningAgent(Agent):
         # TODO: Prepare for a new trip; reset any variables here, if required
         self.initDeadline = None
         self.dtime = 0
+
+        self.alpha = self.alpha_start/self.trial_number
+        self.gamma = self.gamma_start/self.trial_number
+        self.epsilon = self.epsilon_start/self.trial_number     
+        
+#        self.alpha = self.alpha - (self.alpha_start/100)
+#        self.gamma = self.gamma - (self.gamma_start/100)
+#        self.epsilon = self.epsilon - (self.epsilon_start/100)
+        
+        self.rewards[self.trial_number] = self.total_reward
+        self.total_reward = 0
+
         self.trial_number += 1
         
-        # Change params HERE
-        self.alpha = 0.5/self.trial_number    # learning rate =  1 = full learning, 0 = no learning
-        self.gamma = 0.5/self.trial_number    # discount rate = Gamma of 1 emphasizes long term rewards, 0 for short term rewards
-        self.epsilon = 0.5/self.trial_number  # epsilon = how often to choose a random action, 1 = always, 0 = never
+        # Secondary params
+#        if self.trial_number <=90:
+#            self.alpha = 0.9   # learning rate =  1 = full learning, 0 = no learning
+#            self.gamma = 0.9   # discount rate = Gamma of 1 emphasizes long term rewards, 0 for short term rewards
+#            self.epsilon = 0.9  # epsilon = how often to choose a random action, 1 = always, 0 = never
+#        else:
+#            self.alpha = 0   
+#            self.gamma = 0 
+#            self.epsilon = 0
+
+
 
 
     def update(self, t):
@@ -56,7 +85,7 @@ class LearningAgent(Agent):
         if self.dtime == 0:
             self.initDeadline = deadline
             self.dtime += 1
-#            
+            
 #            # scale deadline into 4 ordinal values
 #            deadline_range = range(1,self.initDeadline+1,1)
 #            self.level_1 = int(np.percentile(deadline_range, 100))
@@ -72,13 +101,16 @@ class LearningAgent(Agent):
 #            deadline = 'level_3'
 #        elif deadline <= self.level_4:
 #            deadline = 'level_4'
+#        
+#        gamma = self.gamma
+#        gamma = gamma - (self.gamma/self.initDeadline)
+
 
         if deadline >= 0:
             deadline = 'met_deadline'
         else:
             deadline = 'missed_deadline'
 
-        
         
         # TODO: Update state
         tmpinputs = inputs    ## create another dictionary with all inputs bc inputs needs to be modified
@@ -110,17 +142,25 @@ class LearningAgent(Agent):
 
         # Execute action and get reward
         reward = self.env.act(self, action)
-
+        self.total_reward = self.total_reward + reward        
+        
         # TODO: Learn policy based on state, action, reward
         if action in self.Qtable[self.state]:
             pass
         else:
-            self.Qtable[self.state][action] = 0    # set default value for action
+            self.Qtable[self.state][action] = self.initQvalue    # set default value for action
 
         Qvalue = self.Qtable[self.state][action]
         Qvalueupdate = (1-self.alpha)*self.QvaluePrev + self.alpha*(reward + (self.gamma*Qvalue))
         self.Qtable[self.statePrev][self.actionPrev] = Qvalueupdate    # Set updated Qvalue in dictionary
-        #Q(s,a) = (1-self.alpha)*Q(s,a) + self.alpha*(R' + self.gamma*Q(s',a'))
+        
+        ''' 
+        Q(s,a) = (1-self.alpha)*Q(s,a) + self.alpha*(R' + self.gamma*Q(s',a'))
+        
+        All learning: Q = (1-1)*1 + 1*(2 + (1*1.5))
+        No learning: Q = (1-0)*1 + 0*(2 + (0*1.5))
+        '''        
+        
         
         
         # Store values for next iteration
@@ -155,151 +195,38 @@ def run():
     sim.run(n_trials=num_trials)  # run for a specified number of trials
     # NOTE: To quit midway, press Esc or close pygame window, or hit Ctrl+C on the command-line
     
-    return sim.record, a.Qtable, num_trials # returns an ordered dictionary with {trail number:{win/lose:% time remaining}}
+    return sim.record, a.Qtable, num_trials, a.rewards # returns an ordered dictionary with {trail number:{win/lose:% time remaining}}
                         # example: win with 25% of the time remaining, took 75% of the time to get there
 
 if __name__ == '__main__':
     
-    resultdict = OrderedDict()
-    diclist = ['win-25', 'win-50', 'win-75', 'win-100', 'win-total', 'lose']
-    for d in diclist:
-        resultdict[d] = 0
 
-    for x in range(3):
-        rec, Qtable, num_trials = run()
+    rec, Qtable, num_trials, rewards = run()
     
-        for i in rec:
-            if rec[i][0] == 'Win':
-                resultdict['win-total'] += 1
-                if i <= num_trials*0.25:
-                    resultdict['win-25'] += 1
-                elif num_trials*0.25 < i <= num_trials*0.50:
-                    resultdict['win-50'] += 1
-                elif num_trials*0.50 < i <= num_trials*0.75:
-                    resultdict['win-75'] += 1
-                elif num_trials*0.75 < i <= num_trials*1.0:
-                    resultdict['win-100'] += 1
-            else:
-                resultdict['lose'] += 1
-    print '\n', resultdict
+   
+# plot rewards
+x = rewards.keys()
+y = rewards.values()
+plt.figure(figsize=(8,4))
+plt.scatter(x,y)
+plt.plot(x,y)
+plt.show()
+
+# plot win/lose and percentage of time left
+a = rewards.keys()
+a1 = a[:-10]
+a2 = a[-10:]
+b = [1 if rec[i][0] == 'Win' else 0 for i in rec]
+c = [rec[i][1] for i in rec]
+d = b[:-10]
+e = b[-10:]
+plt.figure(figsize=(8,4))
+perc = plt.scatter(a,c, color = 'r', label = '% time rem.')
+win = plt.scatter(a1,d, color = 'b', label = 'Win/lose')
+last = plt.scatter(a2,e, color = 'g', label = 'Last 10')
+plt.legend(handles=[win, perc, last], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.show()
     
-
-'''
-Run = 100 trials 3 times
-
---- Parameters 1 --- 
-alpha = 1
-gamma = 1
-epsilon = 1
-empty qvalue = 0
-
-OrderedDict([('win-25', 16), ('win-50', 18), ('win-75', 16), ('win-100', 16), 
-             ('win-total', 66), ('lose', 234)])
-
-
---- Parameters 2 --- 
-alpha = 1
-gamma = 1
-epsilon = 1
-empty qvalue = 3
-
-OrderedDict([('win-25', 20), ('win-50', 19), ('win-75', 14), ('win-100', 24), 
-             ('win-total', 77), ('lose', 223)])
-
-
---- Parameters 3 --- 
-alpha = 0.5
-gamma = 0.5
-epsilon = 0.5
-empty qvalue = 0
-
-OrderedDict([('win-25', 11), ('win-50', 19), ('win-75', 25), ('win-100', 26), 
-             ('win-total', 81), ('lose', 219)])
-0.27
-
-OrderedDict([('win-25', 278), ('win-50', 285), ('win-75', 317), ('win-100', 313), 
-             ('win-total', 1193), ('lose', 1807)])
-0.40
-
-OrderedDict([('win-25', 2194), ('win-50', 2279), ('win-75', 2314), ('win-100', 2271), 
-             ('win-total', 9058), ('lose', 20942)])
-0.30
-
-OrderedDict([('win-25', 10682), ('win-50', 0), ('win-75', 0), ('win-100', 0), 
-             ('win-total', 10682), ('lose', 7292)])
-almost 18,000 trials = 0.59
-
-
-OrderedDict([('win-25', 12), ('win-50', 2), ('win-75', 0), ('win-100', 4), ('win-total', 18), ('lose', 9982)])
-10,000 trials with deadline as binary = poor!
-
-
---- Parameters 4 --- 
-alpha = 0.1
-gamma = 0.1
-epsilon = 0.1
-empty qvalue = 0
-
-OrderedDict([('win-25', 10), ('win-50', 15), ('win-75', 17), ('win-100', 17), 
-             ('win-total', 59), ('lose', 241)])
-
-
---- Parameters 5 --- 
-alpha = 0.5
-gamma = 0.5
-epsilon = 0.5
-empty qvalue = 0
-no deadline in state, 30 runs
-
-OrderedDict([('win-25', 124), ('win-50', 117), ('win-75', 109), ('win-100', 119), 
-             ('win-total', 469), ('lose', 2531)])
-
-
---- Parameters 6 --- 
-alpha = 1
-gamma = 0.5
-epsilon = 0.5
-empty qvalue = 0
-
-OrderedDict([('win-25', 17), ('win-50', 18), ('win-75', 5), ('win-100', 18), 
-             ('win-total', 58), ('lose', 242)])
-
-
-
---- Parameters 7 --- 
-alpha = 0.5
-gamma = 1
-epsilon = 0.5
-empty qvalue = 0
-
-OrderedDict([('win-25', 21), ('win-50', 23), ('win-75', 19), ('win-100', 16), 
-             ('win-total', 79), ('lose', 221)])
-
-
---- Parameters 8 --- 
-alpha = 0.5
-gamma = 0.5
-epsilon = 1
-empty qvalue = 0
-
-OrderedDict([('win-25', 19), ('win-50', 18), ('win-75', 16), ('win-100', 15), 
-             ('win-total', 68), ('lose', 232)])
-
-
---- Parameters 8 --- 
-alpha = 1
-gamma = 1
-epsilon = 0.5
-empty qvalue = 0
-
-OrderedDict([('win-25', 17), ('win-50', 10), ('win-75', 14), ('win-100', 11), 
-             ('win-total', 52), ('lose', 248)])
-
-
-
-'''
-
-
 
 
 
