@@ -31,7 +31,7 @@ class Environment(object):
     valid_headings = [(1, 0), (0, -1), (-1, 0), (0, 1)]  # ENWS
     hard_time_limit = -100  # even if enforce_deadline is False, end trial when deadline reaches this value (to avoid deadlocks)
 
-    def __init__(self, num_dummies=3):
+    def __init__(self, alpha, gamma, epsilon, qvalue, num_dummies=3, ):
         self.num_dummies = num_dummies  # no. of dummy agents
         
         # Initialize simulation variables
@@ -65,6 +65,10 @@ class Environment(object):
         # Primary agent and associated parameters
         self.primary_agent = None  # to be set explicitly
         self.enforce_deadline = False
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.qvalue = qvalue
 
     def create_agent(self, agent_class, *args, **kwargs):
         agent = agent_class(self, *args, **kwargs)
