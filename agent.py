@@ -212,7 +212,7 @@ if __name__ == '__main__':
     all_combinations = list(itertools.product(alpha, gamma, epsilon, qvalue))
     result_table = pd.DataFrame()
     tot_count = 1
-    all_combinations = all_combinations[:10]
+    #all_combinations = all_combinations[:10]    # use this for debugging
     print '\n\n\nApplying brute force....\n\n\n'
     time.sleep(3)    
     
@@ -241,7 +241,11 @@ if __name__ == '__main__':
         #print 'time:', time.time() - starttime
         tot_count += 1
 
-   
+
+# write table to file
+result_table.to_csv("C:/Users/kenny/Google Drive/Personal/Udacity/ML Nanodegree/P4 - Smart Cab/original code.csv", 
+                    index = False, encoding='utf-8')
+
 ## plot rewards
 #x = rewards.keys()
 #y = rewards.values()
