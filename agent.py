@@ -113,17 +113,17 @@ class LearningAgent(Agent):
 #        gamma = gamma - (self.gamma/self.initDeadline)
 
 
-        if deadline >= 0:
-            deadline = 'met_deadline'
-        else:
-            deadline = 'missed_deadline'
+#        if deadline >= 0:
+#            deadline = 'met_deadline'
+#        else:
+#            deadline = 'missed_deadline'
 
         
         # TODO: Update state
         tmpinputs = inputs    ## create another dictionary with all inputs bc inputs needs to be modified
         del tmpinputs['right']    ## remove the input 'right' because it is not relevant to our state
         state_list = [tmpinputs[i] for i in tmpinputs.keys()]    ## make a list out of the values from the inputs dictionary
-        [state_list.append(a) for a in [deadline, self.next_waypoint]]    ##  append deadline and next_waypoint to the state list
+        [state_list.append(a) for a in [self.next_waypoint]]    ## deadline,  append deadline and next_waypoint to the state list
         self.state = tuple(state_list)    ## creates tuple of states as (Light, Oncoming, Left, Deadline, Next waypoint)
         
         
@@ -206,72 +206,120 @@ def run(alpha, gamma, epsilon, qvalue):
     return sim.record, a.Qtable, num_trials, a.rewards, a.penalties # returns an ordered dictionary with {trail number:{win/lose:% time remaining}}
                         # example: win with 25% of the time remaining, took 75% of the time to get there
 
-if __name__ == '__main__':
-    alpha = gamma = epsilon = np.arange(0,1,0.1)
-    qvalue = range(0, 11)
-    all_combinations = list(itertools.product(alpha, gamma, epsilon, qvalue))
-    result_table = pd.DataFrame()
-    tot_count = 1
-    #all_combinations = all_combinations[:10]    # use this for debugging
-    print '\n\n\nApplying brute force....\n\n\n'
-    time.sleep(3)    
+if __name__ == '__main__':  
     
-    for combo in all_combinations:
-        #starttime = time.time()
-        rec, Qtable, num_trials, rewards, penalties = run(combo[0], combo[1], combo[2], combo[3])
-        win_lose = []
-        time_rem = []
-        for trial in rec:
-            win_lose.append(rec[trial][0])
-            time_rem.append(rec[trial][1])
-        last10_success_rate = win_lose[-10:].count('Win')/float(len(win_lose[-10:]))
-        last10_num_penalties = np.cumsum(penalties.values()[-10:])[9]
-        last10_med_time_remaining = np.median(time_rem[-10:])
-        success_rate = win_lose.count('Win')/float(len(win_lose))
-        num_penalties = np.cumsum(penalties.values())[len(penalties)-1]
-        med_time_remaining = np.median(time_rem)
+    def brute_force(all_combinations):
+        result_table = pd.DataFrame()
+        #all_combinations = all_combinations[:10]    # use this for debugging
+        print '\n\n\nApplying brute force....\n\n\n'
+        time.sleep(3)    
         
-        s1 = pd.Series([combo[0], combo[1], combo[2], combo[3], 
-                        last10_success_rate, last10_num_penalties, last10_med_time_remaining, 
-                        success_rate, num_penalties, med_time_remaining], 
-                       index=['alpha', 'gamma', 'epsilon', 'qvalue', 
-                       'last10.success_rate', 'last10.num_penalties', 'last10.med_time_remaining',
-                       'success_rate', 'num_penalties', 'med_time_remaining'])
-        result_table = result_table.append(s1, ignore_index=True)
-        #print 'time:', time.time() - starttime
-        tot_count += 1
-
-
-# write table to file
+        for combo in all_combinations:
+            #starttime = time.time()
+            rec, Qtable, num_trials, rewards, penalties = run(combo[0], combo[1], combo[2], combo[3])
+            win_lose = []
+            time_rem = []
+            for trial in rec:
+                win_lose.append(rec[trial][0])
+                time_rem.append(rec[trial][1])
+            last10_success_rate = win_lose[-10:].count('Win')/float(len(win_lose[-10:]))
+            last10_num_penalties = np.cumsum(penalties.values()[-10:])[9]
+            last10_med_time_remaining = np.median(time_rem[-10:])
+            success_rate = win_lose.count('Win')/float(len(win_lose))
+            num_penalties = np.cumsum(penalties.values())[len(penalties)-1]
+            med_time_remaining = np.median(time_rem)
+            
+            s1 = pd.Series([combo[0], combo[1], combo[2], combo[3], 
+                            last10_success_rate, last10_num_penalties, last10_med_time_remaining, 
+                            success_rate, num_penalties, med_time_remaining], 
+                           index=['alpha', 'gamma', 'epsilon', 'qvalue', 
+                           'last10_success_rate', 'last10_num_penalties', 'last10_med_time_remaining',
+                           'success_rate', 'num_penalties', 'med_time_remaining'])
+            result_table = result_table.append(s1, ignore_index=True)
+            #print 'time:', time.time() - starttime
+        return result_table
+    
+    # normal run
+    combo = tuple([0.8, 0.3, 0.8, 5.0])    # alpha, gamma, epsilon, qvalue
+    rec, Qtable, num_trials, rewards, penalties = run(combo[0], combo[1], combo[2], combo[3]) 
+        
+    
+    
+    
+'''
+## write table to file
 result_table.to_csv("C:/Users/kenny/Google Drive/Personal/Udacity/ML Nanodegree/P4 - Smart Cab/original code.csv", 
                     index = False, encoding='utf-8')
 
-## plot rewards
-#x = rewards.keys()
-#y = rewards.values()
-#u = penalties.values()
-#plt.figure(figsize=(8,4))
-#trewards = plt.scatter(x,y, color = 'b', label = 'total rewards')
-#tpenalties = plt.scatter(x,u, color = 'r', label = 'total penalties')
-#plt.legend(handles=[trewards, tpenalties], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#plt.plot(x,y, color = 'b')
-#plt.plot(x,u, color = 'r')
-#plt.show()
-#
-## plot win/lose and percentage of time left
-#a = rewards.keys()
-#a1 = a[:-10]
-#a2 = a[-10:]
-#b = [1 if rec[i][0] == 'Win' else 0 for i in rec]
-#c = [rec[i][1] for i in rec]
-#d = b[:-10]
-#e = b[-10:]
-#plt.figure(figsize=(8,4))
-#perc = plt.scatter(a,c, color = 'r', label = '% time rem.')
-#win = plt.scatter(a1,d, color = 'b', label = 'Win/lose')
-#last = plt.scatter(a2,e, color = 'g', label = 'Last 10')
-#plt.legend(handles=[win, perc, last], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-#plt.show()
+## initial brute force
+alpha = gamma = epsilon = np.arange(0,1,0.1)
+qvalue = range(0, 11)
+all_combinations = list(itertools.product(alpha, gamma, epsilon, qvalue))
+
+
+## work with 1% of best answers, 
+# narrow down by: last10 success rate first, 
+# run each of these 3x and average
+r_table = pd.read_csv("C:/Users/kenny/Google Drive/Personal/Udacity/ML Nanodegree/P4 - Smart Cab/original code.csv")
+sub = r_table[r_table.last10_success_rate==1]
+sub_sort = sub.sort_values(by=['last10_success_rate', 'last10_num_penalties', 'last10_med_time_remaining'], 
+                ascending=[False, True, False])
+sub_sort = sub_sort[:100]
+for i in sub_sort.iterrows():
+    optimal_params = zip(sub_sort.alpha, sub_sort.gamma, sub_sort.epsilon, sub_sort.qvalue)
+    
+
+## doing things here
+r_table = pd.read_csv("C:/Users/kenny/Google Drive/Personal/Udacity/ML Nanodegree/P4 - Smart Cab/original code.csv")
+sub = r_table[r_table.last10_success_rate==1]
+sub_sort = sub.sort_values(by=['last10_success_rate', 'last10_num_penalties', 'last10_med_time_remaining'], 
+            ascending=[False, True, False])
+sub_sort = sub_sort[:100]
+for i in sub_sort.iterrows():
+    optimal_params = zip(sub_sort.alpha, sub_sort.gamma, sub_sort.epsilon, sub_sort.qvalue)
+
+tot_count = 1
+combine_result = pd.DataFrame()
+for rounds in range(3):
+    final_result = brute_force(optimal_params)
+    final_result.to_csv("C:/Users/kenny/Google Drive/Personal/Udacity/ML Nanodegree/P4 - Smart Cab/optimal" + str(rounds) + ".csv", 
+                    index = False, encoding='utf-8')
+    tot_count += 1
+    combine_result = pd.concat([combine_result,final_result], ignore_index=True)
+    
+    
+## find max of 100 best params
+result_sort = combine_result.sort_values(by=['last10_success_rate', 'last10_num_penalties', 'last10_med_time_remaining'], 
+                ascending=[False, True, False])
+'''
+
+
+# plot rewards
+x = rewards.keys()
+y = rewards.values()
+u = penalties.values()
+plt.figure(figsize=(8,4))
+trewards = plt.scatter(x,y, color = 'b', label = 'total rewards')
+tpenalties = plt.scatter(x,u, color = 'r', label = 'total penalties')
+plt.legend(handles=[trewards, tpenalties], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.plot(x,y, color = 'b')
+plt.plot(x,u, color = 'r')
+plt.show()
+
+# plot win/lose and percentage of time left
+a = rewards.keys()
+a1 = a[:-10]
+a2 = a[-10:]
+b = [1 if rec[i][0] == 'Win' else 0 for i in rec]
+c = [rec[i][1] for i in rec]
+d = b[:-10]
+e = b[-10:]
+plt.figure(figsize=(8,4))
+perc = plt.scatter(a,c, color = 'r', label = '% time rem.')
+win = plt.scatter(a1,d, color = 'b', label = 'Win/lose')
+last = plt.scatter(a2,e, color = 'g', label = 'Last 10')
+plt.legend(handles=[win, perc, last], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.show()
     
 
 '''
